@@ -1,0 +1,11 @@
+_ > nanoagent.plugin.v0001.ProductConfig:
+tagline: "See what an online game really shows, and when"
+summary: "Online games never draw the live position: the client draws a little in the past from buffered server snapshots, the server rewinds time to judge shots, and spectator feeds run seconds behind. Give it the snapshots, shots or match events and it works out exactly what each player and spectator sees."
+highlights:
+  - "Positions interpolated exactly from the snapshots that have arrived, lost packets included"
+  - "Lag compensation: each shot judged against where the shooter saw the target"
+  - "Spectator broadcast delay: the scores viewers see, and what is still hidden"
+steps:
+  - "Give the server snapshots with their arrival times, a shot log, or the match events"
+  - "It draws each frame a delay behind, rewinds shots, or delays the broadcast"
+  - "It reports positions, hits and the smallest delay that never runs dry"

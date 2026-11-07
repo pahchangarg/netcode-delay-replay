@@ -1,0 +1,65 @@
+_ > nanoagent.plugin.v0001.ManifestConfig:
+id: netcode-delay-replay
+name: Netcode Delay Replay
+version: 0.1.0
+status: ready
+spec: nanoagent.plugin/v0001
+
+runtime > nanoagent.plugin.v0001.RuntimeConfig:
+  type: mcp_stdio
+  command: [uv, run, --frozen, python, -m, plugin]
+
+permissions > nanoagent.plugin.v0001.PermissionsConfig:
+  network > nanoagent.plugin.v0001.NetworkConfig:
+    hosts: []
+  filesystem > nanoagent.plugin.v0001.FilesystemConfig:
+    write: [workspace]
+
+# One entry per contract.Tool; its input and output classes are contract.TOOLS's.
+tools > dict[contract.Tool, nanoagent.plugin.v0001.ToolConfig]:
+  render_positions:
+    description: Work out what a game client draws at each time, a render delay in the past, from the server snapshots that have arrived, interpolating between them
+  rewind_shot:
+    description: Apply lag compensation to one shot, rewinding the target to what the shooter saw, and say whether it hit
+  spectator_view:
+    description: Show what a delayed spectator broadcast reveals at a given live time, its scores, last event and how many events are still hidden
+
+# One entry per contract.Task; its input and output classes are contract.TASKS's.
+tasks > dict[contract.Task, nanoagent.plugin.v0001.TaskConfig]:
+  render-positions:
+    description: Show where the client draws a player at each time
+    runner: tool
+    tools: [render_positions]
+    reference: null
+    instructions: Draw a frame at each time from the snapshots that have arrived, the delay in the past.
+  rewind-shot:
+    description: Decide one shot with lag compensation
+    runner: tool
+    tools: [rewind_shot]
+    reference: null
+    instructions: Rewind the target to what the shooter saw and test the hit.
+  spectator-view:
+    description: Show what the delayed spectator feed reveals
+    runner: tool
+    tools: [spectator_view]
+    reference: null
+    instructions: Report the scores, last event and hidden events a spectator sees at the live time.
+  judge-shots:
+    description: Decide which shots hit after lag compensation, and which hit first in game time
+    runner: agent
+    tools: [rewind_shot]
+    reference: null
+    instructions: |-
+      Decide every shot in the log with lag compensation.
+      For each shot, call rewind_shot with the request's history, delay_ms, max_rewind_ms and radius, and the shot's received_ms, latency_ms, aim_x and aim_y.
+      Submit hits: the shot_ids whose status is hit, in the shots' order. Shots that are miss, too_old or no_history are not hits.
+      Submit first_hit: among the hits, the one with the smallest rewind_ms (on a tie, the one earlier in the shots' order), or null if no shot hit. This can differ from the first shot the server received.
+  min-safe-delay:
+    description: Find the smallest render delay that never runs out of snapshots
+    runner: agent
+    tools: [render_positions]
+    reference: null
+    instructions: |-
+      Find the smallest render delay at which the client can interpolate every frame.
+      The candidate delays are 0, step_ms, 2 * step_ms, and so on, up to max_delay_ms. For a candidate, call render_positions with the request's snapshots and times_ms and that delay_ms. The candidate is safe when every frame's status is interpolated: no frame is held or waiting.
+      A longer delay is not always safer: it can draw a time before the first snapshot. Check candidates from the smallest up and submit the first safe one as delay_ms, or null if none is safe.
